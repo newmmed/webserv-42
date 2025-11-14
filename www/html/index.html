@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>webserv Demo</title>
+	<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+	<div class="container">
+		<header>
+			<h1>webserv Demo Site</h1>
+			<p>C++98 HTTP server demonstration. Browse, upload, and test features.</p>
+			<nav>
+				<a href="/">Home</a>
+				<a href="/upload.html">Upload</a>
+				<a href="/files.html">Uploaded Files</a>
+				<a href="/static/">Static Directory</a>
+				<a href="/about.html">About</a>
+				<a href="/old-page">Redirect Test</a>
+			</nav>
+		</header>
+		<div class="card">
+			<h2>Quick Links</h2>
+			<ul>
+				<li><a href="/test.html">Legacy Test Page</a></li>
+				<li><a href="/static/hello.txt">Static File</a></li>
+				<li><a href="/nope.txt">404 Example</a></li>
+			</ul>
+		</div>
+		<div class="card">
+			<h2>Features</h2>
+			<ul>
+				<li>GET static files & autoindex</li>
+				<li>POST raw file uploads</li>
+				<li>DELETE uploaded files (via curl)</li>
+				<li>Redirections (old-page → new-page)</li>
+				<li>Error pages & body size limits</li>
+			</ul>
+		</div>
+		<div class="card">
+			<h2>How to DELETE a file</h2>
+			<p>After uploading a file, copy its name from <a href="/files.html">Uploaded Files</a> and run:</p>
+			<pre>curl -X DELETE http://127.0.0.1:9900/upload/UPLOADED_FILENAME</pre>
+		</div>
+	</div>
+</body>
+</html>

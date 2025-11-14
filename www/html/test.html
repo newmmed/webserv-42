@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>webserv test suite</title>
+  <style>body{font-family:sans-serif;max-width:900px;margin:2rem auto;line-height:1.5} code{background:#f2f2f2;padding:2px 4px;border-radius:3px}</style>
+</head>
+<body>
+  <h1>webserv test suite</h1>
+  <p>This page links and submits to endpoints that exercise GET, POST (upload), DELETE, redirects, autoindex and error cases.</p>
+
+  <h2>GET basics</h2>
+  <ul>
+    <li><a href="/">Root (index)</a></li>
+    <li><a href="/test.html">This page</a></li>
+    <li><a href="/static/">/static/ (autoindex)</a></li>
+    <li><a href="/static/hello.txt">/static/hello.txt</a></li>
+    <li><a href="/does-not-exist.txt">404 Not Found</a></li>
+  </ul>
+
+  <h2>Redirect</h2>
+  <ul>
+    <li><a href="/old-page">/old-page → 301 to /new-page</a></li>
+  </ul>
+
+  <h2>POST upload</h2>
+  <form id="uploadForm" action="/upload" method="post" enctype="application/octet-stream">
+    <p>Enter text to upload as file content:</p>
+    <textarea name="data" rows="4" cols="60">sample upload data</textarea><br>
+    <button type="submit">POST /upload</button>
+  </form>
+  <p>Note: This uses octet-stream; server will store content to uploads directory if enabled.</p>
+
+  <h2>DELETE</h2>
+  <p>To test DELETE, first POST to /upload to create a file, then use a separate client (curl) to DELETE the reported Location.</p>
+  <pre>curl -i -X DELETE http://127.0.0.1:9900/upload/FILE</pre>
+
+  <h2>Method not allowed</h2>
+  <ul>
+    <li><a href="#" onclick="fetch('/static/hello.txt',{method:'POST'}).then(r=>r.text()).then(t=>alert('Status '+r.status)).catch(()=>{});return false;">POST to /static/hello.txt → 405</a></li>
+  </ul>
+
+  <h2>Body size limit</h2>
+  <p>Try uploading >256KB to /upload; expect 413.</p>
+
+  <hr>
+  <p>Use curl for comprehensive tests. See scripts/test-curl.sh</p>
+</body>
+</html>

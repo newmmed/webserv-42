@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>About webserv</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>About This Project</h1>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/upload.html">Upload</a>
+        <a href="/files.html">Uploaded Files</a>
+        <a href="/static/">Static Directory</a>
+        <a href="/about.html">About</a>
+      </nav>
+    </header>
+    <div class="card">
+      <h2>Overview</h2>
+      <p>This is a minimalist HTTP server written in C++98 using non-blocking sockets and a single <code>poll()</code> loop as required by the project subject.</p>
+      <ul>
+        <li>HTTP/1.0 & HTTP/1.1 request parsing</li>
+        <li>Persistent connections (keep-alive)</li>
+        <li>GET, POST, DELETE implementations</li>
+        <li>Location routing, redirects, error pages</li>
+        <li>Autoindex & file uploads with size limits</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Testing</h2>
+      <p>See <code>scripts/test-curl.sh</code> for automated curl-based tests.</p>
+    </div>
+    <div class="card">
+      <h2>Next Steps</h2>
+      <ul>
+        <li>Implement CGI / dynamic responses</li>
+        <li>Support chunked transfer decoding</li>
+        <li>Advanced logging & metrics</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Uploaded Files</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Uploaded Files</h1>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/upload.html">Upload</a>
+        <a href="/files.html">Uploaded Files</a>
+        <a href="/static/">Static Directory</a>
+        <a href="/about.html">About</a>
+      </nav>
+    </header>
+    <div class="card">
+      <h2>Autoindex</h2>
+      <p>This server exposes an autoindex at <a href="/upload/">/upload/</a>. Use that link to browse files.</p>
+      <p>Files are saved under <code>www/uploads</code> using a timestamp-based name.</p>
+    </div>
+    <div class="card">
+      <h2>Delete a file</h2>
+      <p>Copy a filename from the autoindex and run:</p>
+      <pre>curl -X DELETE http://127.0.0.1:9900/upload/FILENAME</pre>
+      <p>On success you'll get 200 and "Deleted"; unknown files return 404 with an error page.</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,118 @@
+Standard format:
+
+	<type>(<scope>): <subject>
+
+	<body>
+
+	<footer>
+
+Commit Types:
+
+	✨ feat: New feature
+		git commit -m "feat(config): add config file parser
+
+		- Implement tokenizer for NGINX-style config
+		- Add ServerConfig and LocationConfig structures
+		- Support server blocks and location blocks"
+
+	🐛 fix: Bug fix
+		git commit -m "fix(parser): prevent segfault on empty request
+
+		Fixed null pointer dereference when parsing empty HTTP requests.
+		Added null check before accessing request buffer."
+
+	📝 docs: Documentation
+		git commit -m "docs(readme): add setup instructions
+
+		Added installation steps and usage examples
+		Updated configuration section with sample config file"
+
+	🎨 style: Code style/formatting (no logic change)
+		git commit -m "style(server): format code according to norm
+
+		- Fix indentation in Server class
+		- Remove trailing whitespace
+		- Adjust line length to 80 characters"
+
+	♻️ refactor: Code restructuring (no feature/bug change)
+		git commit -m "refactor(request): split large parse function
+
+		Extracted parseHeaders() and parseBody() from parse()
+		Improved readability and maintainability"
+
+	⚡ perf: Performance improvement
+		git commit -m "perf(socket): optimize buffer allocation
+
+		Changed from multiple small allocations to single large buffer
+		Reduced memory fragmentation and improved read performance"
+
+	✅ test: Adding or updating tests
+		git commit -m "test(config): add unit tests for parser
+
+		Added tests for:
+		- Valid config parsing
+		- Invalid syntax handling
+		- Edge cases with empty values"
+
+	🔧 chore: Build/tooling changes
+		git commit -m "chore(makefile): add debug target
+
+		Added 'make debug' target with -g flag
+		Added valgrind memory check target"
+
+	🚀 build: Build system changes
+		git commit -m "build(makefile): optimize compilation flags
+
+		Added -O2 optimization for release builds
+		Separated debug and release targets"
+
+	🗑️ remove: Removing code/files
+		git commit -m "remove(legacy): delete old HTTP/0.9 parser
+
+		Removed deprecated SimpleRequest class
+		Updated references to use new parser"
+
+	🚧 wip: Work in progress (avoid if possible)
+		git commit -m "wip(cgi): initial CGI executor implementation
+
+		Basic structure in place, still need to:
+		- Add environment variable handling
+		- Implement timeout mechanism"
+
+Example:
+
+	✅ Good Examples:
+		# Clear, descriptive
+		feat(upload): implement file upload handler
+
+		# Explains why
+		fix(memory): prevent leak in Request destructor
+		Memory wasn't freed when exception thrown during parsing.
+
+		# References issue
+		fix(socket): handle EADDRINUSE error
+		Closes #23
+
+		# Multiple changes logically grouped
+		refactor(http): reorganize request/response classes
+		- Moved common methods to base class
+		- Separated parsing logic from storage
+		- Improved error handling
+
+	❌ Bad Examples
+		# Too vague
+		git commit -m "fixed stuff"
+
+		# No context
+		git commit -m "update"
+
+		# Multiple unrelated changes
+		git commit -m "fix parser, add tests, update readme, refactor server"
+
+		# Unclear
+		git commit -m "changes"
+		git commit -m "wip"
+		git commit -m "asdf"
+
+P.S: Commit message template is added in .gitmessage as a git config, git commit
+without the -m option will provide it in your text editor.

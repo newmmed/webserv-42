@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Upload File</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Upload a File</h1>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/upload.html">Upload</a>
+        <a href="/files.html">Uploaded Files</a>
+        <a href="/static/">Static Directory</a>
+        <a href="/about.html">About</a>
+      </nav>
+    </header>
+    <div class="card">
+      <h2>Select a file</h2>
+      <input id="fileInput" type="file" />
+      <button class="btn" onclick="uploadFile('/upload')">Upload</button>
+      <div id="status" class="status"></div>
+      <p>Maximum size for /upload: 256K (configured). Larger uploads will return 413.</p>
+      <p>Successful uploads stored in <code>/www/uploads</code> with a timestamp-based name.</p>
+    </div>
+    <div class="card">
+      <h2>Browse uploaded files</h2>
+      <p><a href="/upload/">Open autoindex listing</a></p>
+      <p>DELETE an uploaded file using curl after copying its name:</p>
+      <pre>curl -X DELETE http://127.0.0.1:9900/upload/FILENAME</pre>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

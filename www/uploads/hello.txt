@@ -1,0 +1,2 @@
+Hello from /static/hello.txt
+This file is served from the /static location with autoindex enabled.
