@@ -15,4 +15,4 @@ public:
 	static RouteResult	route(ServerConfig &server, const std::string &path);
 };
 
-#endif // HTTP_ROUTER_HPP
+#endif

@@ -20,6 +20,14 @@
 				<a href="/old-page">Redirect Test</a>
 			</nav>
 		</header>
+		<div class="card" id="welcome-card">
+			<h2>Welcome</h2>
+			<p id="welcome-text">Checking your session…</p>
+			<div id="name-form" style="display:none; margin-top:.5rem;">
+				<input id="name-input" type="text" placeholder="Enter your name" style="padding:.4rem .6rem;" />
+				<button id="name-save" style="padding:.4rem .6rem;">Save</button>
+			</div>
+		</div>
 		<div class="card">
 			<h2>Quick Links</h2>
 			<ul>
@@ -44,5 +52,37 @@
 			<pre>curl -X DELETE http://127.0.0.1:9900/upload/UPLOADED_FILENAME</pre>
 		</div>
 	</div>
+<script>
+(function(){
+	function setWelcome(name){
+		var w = document.getElementById('welcome-text');
+		var form = document.getElementById('name-form');
+		if (name && name.length){
+			w.textContent = 'Welcome, ' + name + '!';
+			form.style.display = 'none';
+		} else {
+			w.textContent = 'Tell us your name to personalize your visit:';
+			form.style.display = '';
+		}
+	}
+	function fetchSession(){
+		return fetch('/session-api',{cache:'no-store'}).then(function(r){ return r.json(); });
+	}
+	function setSessionName(name){
+		return fetch('/session-name',{method:'POST', body:(name||'').trim(), headers:{'Content-Type':'text/plain'}});
+	}
+	document.getElementById('name-save').addEventListener('click', function(){
+		var v = document.getElementById('name-input').value;
+		setSessionName(v).then(function(){ return fetchSession(); }).then(function(data){
+			setWelcome(data.name||'');
+		}).catch(function(err){ alert(err && err.message || 'Error'); });
+	});
+	fetchSession().then(function(data){
+		var input = document.getElementById('name-input');
+		input.value = data.name || '';
+		setWelcome(data.name||'');
+	}).catch(function(){ setWelcome(''); });
+})();
+</script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 /*   By: ouvled <ouvled@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/05 19:48:30 by ouvled            #+#    #+#             */
-/*   Updated: 2025/11/13 11:02:49 by ouvled           ###   ########.fr       */
+/*   Updated: 2025/11/16 01:08:40 by ouvled           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,7 +30,6 @@ typedef struct	Client
 	bool								reqParsed;
 	bool								resSent;
 	time_t								timeout;
-	// HTTP parsing state additions
 	bool								headersParsed;
 	bool								requestComplete;
 	bool								keepAlive;

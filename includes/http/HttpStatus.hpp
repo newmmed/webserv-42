@@ -5,8 +5,8 @@
 
 struct HttpStatus
 {
-	int code;
-	const char* reason;
+	int			code;
+	const char*	reason;
 };
 
 inline const char*	httpReason(int code)
@@ -52,4 +52,4 @@ inline const char*	httpReason(int code)
 	}
 }
 
-#endif // HTTP_STATUS_HPP
+#endif

@@ -10,8 +10,6 @@
 class HttpParser
 {
 public:
-	// Returns true when a full request (headers + body if any) is parsed
-	// On error, fills responseBuffer with an error response and returns false with client.requestComplete=true
 	static bool	parse(Client &client);
 
 private:
@@ -21,4 +19,4 @@ private:
 	static bool	finalizeBodyExpectation(Client &client);
 };
 
-#endif // HTTP_PARSER_HPP
+#endif

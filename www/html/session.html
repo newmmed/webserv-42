@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Session Demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Session / Cookie Demo</h1>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/session.html">Session Demo</a>
+      </nav>
+    </header>
+    <div class="card">
+      <p><strong>Session ID:</strong> <span id="sid">(loading)</span></p>
+      <p><strong>Visit Count (this session):</strong> <span id="visits">(loading)</span></p>
+      <button class="btn" id="refreshBtn">Refresh Session Data</button>
+      <p style="margin-top:1rem;font-size:.9em">A cookie named <code>sid</code> is set with HttpOnly & SameSite=Lax. Each refresh increments <code>visitCount</code> server-side.</p>
+    </div>
+  </div>
+  <script>
+    async function loadSession(){
+      try {
+        const r = await fetch('/session-api');
+        const data = await r.json();
+        document.getElementById('sid').textContent = data.sid || '(none)';
+        document.getElementById('visits').textContent = data.visits;
+      } catch(e){
+        document.getElementById('sid').textContent = 'error';
+        document.getElementById('visits').textContent = 'error';
+      }
+    }
+    document.getElementById('refreshBtn').addEventListener('click', loadSession);
+    loadSession();
+  </script>
+</body>
+</html>

@@ -6,7 +6,7 @@
 /*   By: ouvled <ouvled@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/21 08:28:45 by ouvled            #+#    #+#             */
-/*   Updated: 2025/11/13 09:59:57 by ouvled           ###   ########.fr       */
+/*   Updated: 2025/11/16 01:03:39 by ouvled           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -72,7 +72,6 @@ LocationConfig* ServerConfig::findLocation(const std::string &path)
 			continue;
 		if (path.size() >= locPath.size() && path.compare(0, locPath.size(), locPath) == 0)
 		{
-			// Root location "/" should match everything
 			bool	boundaryOK = (locPath == "/") || path.size() == locPath.size() || path[locPath.size()] == '/';
 			if (boundaryOK)
 			{

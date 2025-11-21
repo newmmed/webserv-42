@@ -7,7 +7,6 @@
 
 namespace http
 {
-	// toLower: ASCII-only lowercase transformation (stable for other bytes).
 	std::string toLower(const std::string& s)
 	{
 		std::string	r;
@@ -18,13 +17,11 @@ namespace http
 		return r;
 	}
 
-	// isSpace: internal helper for ASCII whitespace classification.
 	static bool isSpace(char c)
 	{
 		return c==' ' || c=='\t' || c=='\r' || c=='\n' || c=='\f';
 	}
 
-	// trim: removes leading/trailing ASCII whitespace; returns empty for all-space.
 	std::string trim(const std::string& s)
 	{
 		size_t	b = 0;
@@ -39,7 +36,6 @@ namespace http
 		return s.substr(b, e - b + 1);
 	}
 
-	// iequals: case-insensitive equality (ASCII); avoids allocation.
 	bool iequals(const std::string& a,const std::string& b)
 	{
 		if (a.size() != b.size())
@@ -50,7 +46,6 @@ namespace http
 		return true;
 	}
 
-	// urlDecode: decodes percent-encoded bytes and maps '+' to space.
 	std::string urlDecode(const std::string& in)
 	{
 		std::string	out;
@@ -73,7 +68,6 @@ namespace http
 		return out;
 	}
 
-	// joinPath: concatenates two components with exactly one slash between.
 	std::string joinPath(const std::string& a,const std::string& b)
 	{
 		if (a.empty())
@@ -83,12 +77,8 @@ namespace http
 		return a + '/' + (b.size() && b[0]=='/' ? b.substr(1) : b);
 	}
 
-	// isSafePath: naive traversal guard; rejects any ".." segment in the path.
-	// Note: base is not canonicalized here; deeper hardening can normalize real paths.
-	bool isSafePath(const std::string& base,const std::string& path)
+	bool isSafePath(const std::string& path)
 	{
-		// reject any ".." traversal and ensure path starts with base logically after resolution
-		(void)base; // currently unused; placeholder for future canonicalization
 		size_t	pos = 0;
 		while (pos < path.size())
 		{
@@ -102,7 +92,6 @@ namespace http
 		return true;
 	}
 
-	// guessContentType: coarse mapping from file extension to Content-Type.
 	std::string guessContentType(const std::string& path)
 	{
 		size_t		dot = path.find_last_of('.');
@@ -128,7 +117,6 @@ namespace http
 		return "application/octet-stream";
 	}
 
-	// formatDateGmt: RFC-1123 GMT date used for Date header.
 	std::string formatDateGmt()
 	{
 		std::time_t	t = std::time(NULL);

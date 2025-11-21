@@ -6,7 +6,7 @@
 /*   By: ouvled <ouvled@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/09 23:03:55 by ouvled            #+#    #+#             */
-/*   Updated: 2025/11/13 10:00:29 by ouvled           ###   ########.fr       */
+/*   Updated: 2025/11/16 01:08:51 by ouvled           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,9 +37,6 @@ typedef struct	LocationConfig
 	size_t								getBodySize(size_t serverBodySize) const;
 	std::string							getRoot(const std::string &serverRoot) const;
 }				LocationConfig;
-
-// This struct is assigned by values read from the config file
-// listens vector contains addresses and ports that the server should be binded to for incoming connections
 
 typedef struct	ServerConfig
 {

@@ -6,12 +6,12 @@
 
 struct HttpRequest
 {
-	std::string							method;     // GET, POST, DELETE
-	std::string							target;     // Raw request-target (path + query)
-	std::string							path;       // Decoded path
-	std::string							query;      // Query part without '?'
-	std::string							version;    // HTTP/1.0 or HTTP/1.1
-	std::map<std::string, std::string>	headers; // lower-cased keys
+	std::string							method;
+	std::string							target;
+	std::string							path;  
+	std::string							query; 
+	std::string							version;
+	std::map<std::string, std::string>	headers;
 	std::string							body;
 
 	void clear()
@@ -26,4 +26,4 @@ struct HttpRequest
 	}
 };
 
-#endif // HTTP_REQUEST_HPP
+#endif

@@ -6,7 +6,7 @@
 /*   By: ouvled <ouvled@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/05 19:54:49 by ouvled            #+#    #+#             */
-/*   Updated: 2025/11/13 11:02:32 by ouvled           ###   ########.fr       */
+/*   Updated: 2025/11/16 05:31:19 by ouvled           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,6 +22,107 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <sstream>
+#include <algorithm>
+
+std::string	Server::generateSessionId()
+{
+	unsigned char	raw[SESSION_ID_BYTES];
+	int				fd = ::open("/dev/urandom", O_RDONLY);
+	if (fd >= 0)
+	{
+		ssize_t	r = ::read(fd, raw, SESSION_ID_BYTES);
+		::close(fd);
+		if (r == static_cast<ssize_t>(SESSION_ID_BYTES))
+		{
+			std::ostringstream	oss;
+			for (size_t i = 0; i < SESSION_ID_BYTES; ++i)
+			{
+				static const char	*hex = "0123456789abcdef";
+				oss << hex[(raw[i] >> 4) & 0xF] << hex[raw[i] & 0xF];
+			}
+			return oss.str();
+		}
+	}
+	return std::string("");
+}
+
+void	Server::cleanupExpiredSessions()
+{
+	time_t	now = time(NULL);
+	for (std::map<std::string, Session>::iterator it = _sessions.begin(); it != _sessions.end(); )
+	{
+		if (it->second.expiresAt <= now)
+			_sessions.erase(it++);
+		else
+			++it;
+	}
+}
+
+std::map<std::string,std::string>	Server::parseCookies(const std::string &cookieHeader)
+{
+	std::map<std::string,std::string>	result;
+	size_t								pos = 0;
+	while (pos < cookieHeader.size())
+	{
+		size_t		semi = cookieHeader.find(';', pos);
+		std::string	part;
+		if (semi != std::string::npos)
+			part = cookieHeader.substr(pos, semi-pos);
+		else
+			part = cookieHeader.substr(pos, std::string::npos);
+		if (semi == std::string::npos)
+			pos = cookieHeader.size();
+		else
+			pos = semi + 1;
+		size_t		b = 0;
+		while (b < part.size() && (part[b] == ' ' || part[b] == '\t'))
+			++b;
+		size_t		e = part.size();
+		while (e > b && (part[e - 1] == ' ' || part[e - 1] == '\t'))
+			--e;
+		if (b >= e)
+			continue ;
+		std::string	token = part.substr(b, e - b);
+		size_t		eq = token.find('=');
+		if (eq == std::string::npos)
+			continue ;
+		std::string	name = token.substr(0, eq);
+		std::string	value = token.substr(eq+1);
+		if (value.size() >= 2 && value[0] == '"' && value[value.size() - 1] == '"')
+			value = value.substr(1, value.size() - 2);
+		result[name] = value;
+	}
+	return result;
+}
+
+Session*	Server::getOrCreateSession(const std::map<std::string,std::string> &cookies, HttpResponse &resp)
+{
+	cleanupExpiredSessions();
+	std::map<std::string,std::string>::const_iterator	it = cookies.find("sid");
+	if (it != cookies.end())
+	{
+		std::map<std::string, Session>::iterator	sit = _sessions.find(it->second);
+		if (sit != _sessions.end() && sit->second.expiresAt > time(NULL))
+		{
+			sit->second.expiresAt = time(NULL) + SESSION_TTL_SECONDS;
+			return &sit->second;
+		}
+	}
+	std::string	sid = generateSessionId();
+	while (_sessions.find(sid) != _sessions.end())
+		sid = generateSessionId();
+	Session	s;
+	s.id = sid;
+	s.expiresAt = time(NULL) + SESSION_TTL_SECONDS;
+	s.visitCount = 0;
+	s.name = "";
+	_sessions[sid] = s;
+	std::ostringstream	attrs;
+	attrs << "Path=/; HttpOnly; SameSite=Lax; Max-Age=" << SESSION_TTL_SECONDS;
+	resp.addSetCookie("sid", sid, attrs.str());
+	return &_sessions[sid];
+}
 
 Server::Server(Config &config, std::vector<std::pair<int, std::pair<std::string, int> > > allListens, int serverCount) : _conf(config), _allListens(allListens), _serverCount(serverCount)
 {
@@ -30,6 +131,7 @@ Server::Server(Config &config, std::vector<std::pair<int, std::pair<std::string,
 
 void	Server::startServer()
 {
+	std::cout << "Server has been started!" << std::endl;
 	while (86)
 	{
 		std::vector<struct pollfd>	polls;
@@ -81,10 +183,8 @@ void	Server::startServer()
 					deleteClient(clientFd);
 					continue ;
 				}
-				// read from client
 				if (polls[i].revents & POLLIN)
 					handleClientInput(_clients.find(clientFd)->second);
-				// ready to write without blocking
 				if (polls[i].revents & POLLOUT)
 					handleClientOutput(_clients.find(clientFd)->second);
 			}
@@ -111,7 +211,6 @@ void	Server::openListeningSocks()
 			++it;
 	}
 	_listeningSocketsCount = _socks.size();
-	std::cout << "Opened all listening sockets successfully" << std::endl;
 }
 
 void	Server::handleSock(int sockfd, std::pair<std::string, int> bindInfo, E_SOCKTYPE type)
@@ -172,10 +271,7 @@ void	Server::timeoutChecker()
 	for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); ++it)
 	{
 		if (currentTime - it->second.timeout > timeout)
-		{
-			std::cout << "Client timeout, socket fd: " << it->first << std::endl;
 			toClose.push_back(it->first);
-		}
 	}
 	for (size_t i = 0; i < toClose.size(); i++)
 		deleteClient(toClose[i]);
@@ -193,7 +289,6 @@ void	Server::acceptNewClient(ListeningSocket &acceptingSocket)
 	clientFd = accept(acceptingSocket._fd, reinterpret_cast<struct sockaddr *>(&clientAddr), &clientAddrLen);
 	if (clientFd < 0)
 	{
-		// readiness was indicated by poll; transient failure, try later
 		std::cerr << "webserv: accept() failed to accept new client" << std::endl;
 		return ;
 	}
@@ -206,17 +301,14 @@ void	Server::acceptNewClient(ListeningSocket &acceptingSocket)
 	clientPort = ntohs(clientAddr.sin_port);
 	Client				newClient = Client(clientFd, address, clientPort, acceptingSocket);
 	_clients.insert(std::make_pair(clientFd, newClient));
-	std::cout << "_clients size is: " << _clients.size() << " Accepted new client of ip addr: " << _clients.find(clientFd)->second.addr.first << " and port: " << _clients.find(clientFd)->second.addr.second << " successfully!" << std::endl;
 }
 
 void	Server::deleteClient(int clientFd)
 {
 	_clients.erase(clientFd);
 	close(clientFd);
-	std::cout << "deleting client fd numba: " << clientFd << std::endl;
 }
 
-// readWholeFile: binary-safe file loader used for static responses and error pages.
 static bool	readWholeFile(const std::string &path, std::string &out)
 {
 	FILE	*fp = std::fopen(path.c_str(), "rb");
@@ -231,7 +323,6 @@ static bool	readWholeFile(const std::string &path, std::string &out)
 	return true;
 }
 
-// isDirectory: tests whether a filesystem path is a directory.
 static bool	isDirectory(const std::string &path)
 {
 	struct stat	st;
@@ -241,7 +332,6 @@ static bool	isDirectory(const std::string &path)
 	return S_ISDIR(st.st_mode);
 }
 
-// getExtension: returns the dot plus extension (e.g., ".py"); empty if none.
 static std::string	getExtension(const std::string &path)
 {
 	size_t	dot = path.find_last_of('.');
@@ -251,18 +341,12 @@ static std::string	getExtension(const std::string &path)
 	return path.substr(dot);
 }
 
-// addEnv: convenience to push "K=V" into the environment vector.
 static void	addEnv(std::vector<std::string> &envv, const std::string &k, const std::string &v)
 {
 	std::string	kv = k + "=" + v;
 	envv.push_back(kv);
 }
 
-// runCgi: executes a CGI interpreter with the target script. It prepares the
-// CGI environment (REQUEST_METHOD, QUERY_STRING, CONTENT_LENGTH/TYPE, HTTP_*)
-// and streams the HTTP request body to the child's stdin. It captures stdout
-// into cgiOut and returns true on successful execution setup. The caller
-// parses cgiOut headers/body and sets the HTTP response accordingly.
 static bool	runCgi(const std::string &interpreter, const std::string &scriptPath, const Client &client, const LocationConfig * /*loc*/, std::string &cgiOut)
 {
 	int	inpipe[2];
@@ -288,14 +372,12 @@ static bool	runCgi(const std::string &interpreter, const std::string &scriptPath
 	}
 	if (pid == 0)
 	{
-		// Child: setup stdio
 		dup2(inpipe[0], STDIN_FILENO);
 		dup2(outpipe[1], STDOUT_FILENO);
 		close(inpipe[0]);
 		close(inpipe[1]);
 		close(outpipe[0]);
 		close(outpipe[1]);
-		// Build environment
 		std::vector<std::string>	envv;
 		addEnv(envv, "GATEWAY_INTERFACE", "CGI/1.1");
 		addEnv(envv, "SERVER_PROTOCOL", client.version.empty() ? "HTTP/1.1" : client.version);
@@ -310,20 +392,17 @@ static bool	runCgi(const std::string &interpreter, const std::string &scriptPath
 			addEnv(envv, "SERVER_PORT", buf);
 		}
 		addEnv(envv, "REMOTE_ADDR", client.addr.first);
-		// Content headers
 		std::map<std::string,std::string>::const_iterator	itcl = client.headers.find("content-length");
 		if (itcl != client.headers.end())
 			addEnv(envv, "CONTENT_LENGTH", itcl->second);
 		std::map<std::string,std::string>::const_iterator	itct = client.headers.find("content-type");
 		if (itct != client.headers.end())
 			addEnv(envv, "CONTENT_TYPE", itct->second);
-		// PHP-CGI specific
 		if (interpreter.find("php-cgi") != std::string::npos || getExtension(scriptPath) == ".php")
 			addEnv(envv, "REDIRECT_STATUS", "200");
-		// HTTP_ headers
 		for (std::map<std::string,std::string>::const_iterator it = client.headers.begin(); it != client.headers.end(); ++it)
 		{
-			std::string name = it->first; // already lower-cased by parser
+			std::string name = it->first;
 			for (size_t i = 0; i < name.size(); ++i)
 			{
 				if (name[i] == '-')
@@ -333,21 +412,17 @@ static bool	runCgi(const std::string &interpreter, const std::string &scriptPath
 			}
 			addEnv(envv, std::string("HTTP_") + name, it->second);
 		}
-		// Convert envv to char*[]
 		std::vector<char*>	envp;
 		envp.reserve(envv.size() + 1);
 		for (size_t i = 0; i < envv.size(); ++i)
 			envp.push_back(const_cast<char*>(envv[i].c_str()));
 		envp.push_back(NULL);
-		// Args: interpreter scriptPath
 		char *const	argv[] = { const_cast<char*>(interpreter.c_str()), const_cast<char*>(scriptPath.c_str()), NULL };
 		execve(interpreter.c_str(), argv, &envp[0]);
 		_exit(127);
 	}
-	// Parent
 	close(inpipe[0]);
 	close(outpipe[1]);
-	// Write body to child's stdin if any
 	if (!client.body.empty())
 	{
 		size_t	off = 0;
@@ -364,7 +439,6 @@ static bool	runCgi(const std::string &interpreter, const std::string &scriptPath
 		}
 	}
 	close(inpipe[1]);
-	// Read all stdout
 	cgiOut.clear();
 	char	buf[4096];
 	ssize_t	n;
@@ -376,8 +450,6 @@ static bool	runCgi(const std::string &interpreter, const std::string &scriptPath
 	return true;
 }
 
-// generateAutoIndexHTML: builds a minimal HTML directory listing for urlPath
-// based on directory entries in dirPath. Used when autoindex is enabled.
 static std::string	generateAutoIndexHTML(const std::string &dirPath, const std::string &urlPath)
 {
 	std::string	html = "<html><head><title>Index of ";
@@ -406,9 +478,6 @@ static std::string	generateAutoIndexHTML(const std::string &dirPath, const std::
 	return html;
 }
 
-// applyErrorPage: if the server config maps the status code to a custom error
-// page, loads it and sets resp.body/Content-Type accordingly; otherwise sets a
-// tiny fallback HTML body. Does not override resp.statusCode or reason.
 static void	applyErrorPage(ServerConfig &servConf, int code, HttpResponse &resp)
 {
 	std::string	errorRel = servConf.getErrorPage(code);
@@ -423,7 +492,6 @@ static void	applyErrorPage(ServerConfig &servConf, int code, HttpResponse &resp)
 			return ;
 		}
 	}
-	// Fallback small body
 	resp.body = "<html><body><h1>" + resp.reason + "</h1></body></html>";
 	resp.headers["Content-Type"] = "text/html";
 }
@@ -435,33 +503,92 @@ void	Server::handleClientInput(Client &client)
 
 	ret = recv(client.fd, clientRecvBuffer, sizeof(clientRecvBuffer) - 1, 0);
 	if (ret < 0)
-	{
-		// transient failure; try again on next POLLIN
 		return ;
-	}
 	if (!ret)
 	{
 		deleteClient(client.fd);
 		return ;
 	}
 	client.timeout = time(NULL);
-	// Append raw bytes (binary-safe). Do NOT treat as C-string.
 	client.requestBuffer.append(clientRecvBuffer, ret);
 	client.bytesReceived += ret;
-	// Attempt incremental HTTP parsing
 	if (!client.requestComplete)
 	{
-		// (client.headersParsed previous state not needed)
 		if (HttpParser::parse(client))
 		{
-			// Build response once request fully parsed
-			HttpResponse	resp;
-			// Route to server + location based on accepting socket's server config
+			HttpResponse								resp;
+			std::map<std::string,std::string>			cookies;
+			std::map<std::string,std::string>::iterator	hcookie = client.headers.find("cookie");
+			if (hcookie != client.headers.end())
+				cookies = parseCookies(hcookie->second);
+			Session	*session = getOrCreateSession(cookies, resp);
+			if (client.method == "GET" && client.path == "/session-api")
+			{
+				if (session)
+					session->visitCount++;
+				resp.statusCode = 200;
+				resp.reason = httpReason(200);
+				std::ostringstream	body;
+				body << "{\n  \"sid\": \"" << (session? session->id:"") << "\",\n  \"visits\": " << (session? session->visitCount:0) << ",\n  \"name\": \"" << (session? session->name:"") << "\"\n}";
+				resp.body = body.str();
+				resp.headers["Content-Type"] = "application/json";
+				client.responseBuffer = resp.serialize(client.keepAlive);
+				return;
+			}
+			if (client.path == "/session-name")
+			{
+				if (!session)
+				{
+					resp.statusCode = 500;
+					resp.reason = httpReason(500);
+					resp.body = "Session is unavailable";
+					resp.headers["Content-Type"] = "text/plain";
+					client.responseBuffer = resp.serialize(client.keepAlive);
+					return ;
+				}
+				if (client.method == "GET")
+				{
+					resp.statusCode = 200;
+					resp.reason = httpReason(200);
+					std::ostringstream	body;
+					body << "{\n  \"name\": \"" << session->name << "\"\n}";
+					resp.body = body.str();
+					resp.headers["Content-Type"] = "application/json";
+					client.responseBuffer = resp.serialize(client.keepAlive);
+					return ;
+				}
+				if (client.method == "POST")
+				{
+					std::string	raw = client.body;
+					while (!raw.empty() && (raw[0] == ' ' || raw[0] == '\t' || raw[0] == '\r' || raw[0] == '\n'))
+						raw.erase(0, 1);
+					while (!raw.empty() && (raw[raw.size() - 1] == ' ' || raw[raw.size() - 1] == '\t' || raw[raw.size() - 1] == '\r' || raw[raw.size() - 1] == '\n'))
+						raw.erase(raw.size() - 1);
+					if (!raw.empty())
+					{
+						for (size_t i = 0; i < raw.size(); ++i)
+							if (raw[i] == '\r' || raw[i] == '\n')
+								raw[i]=' ';
+					}
+					session->name = raw;
+					resp.statusCode = 200;
+					resp.reason = httpReason(200);
+					resp.body = "OK";
+					resp.headers["Content-Type"] = "text/plain";
+					client.responseBuffer = resp.serialize(client.keepAlive);
+					return ;
+				}
+				resp.statusCode = 405;
+				resp.reason = httpReason(405);
+				resp.headers["Allow"] = "GET, POST";
+				resp.body = "";
+				client.responseBuffer = resp.serialize(client.keepAlive);
+				return ;
+			}
 			ServerConfig	&servConf = client.acceptingSock._sconf;
 			RouteResult		rr = HttpRouter::route(servConf, client.path);
 			LocationConfig	*loc = rr.location;
 			std::string		effectiveRoot = loc ? loc->getRoot(servConf.root) : servConf.root;
-			// Redirection
 			if (loc && loc->hasRedirection())
 			{
 				resp.statusCode = loc->redirectionCode;
@@ -470,7 +597,6 @@ void	Server::handleClientInput(Client &client)
 				client.responseBuffer = resp.serialize(client.keepAlive);
 				return ;
 			}
-			// Enforce method allowance
 			if (loc && !loc->isMethodAllowed(client.method))
 			{
 				resp.statusCode = 405;
@@ -489,10 +615,8 @@ void	Server::handleClientInput(Client &client)
 			}
 			else
 			{
-				// Basic handling
 				if (client.method == "GET")
 				{
-					// Map URL path to filesystem path relative to location
 					std::string	relUrl = client.path;
 					if (loc && !loc->path.empty())
 					{
@@ -500,14 +624,13 @@ void	Server::handleClientInput(Client &client)
 							relUrl = relUrl.substr(loc->path.size());
 					}
 					std::string	fullPath = http::joinPath(effectiveRoot, relUrl);
-					// CGI handling if extension matches
 					std::string	ext = getExtension(fullPath);
 					if (loc && !ext.empty())
 					{
 						std::map<std::string,std::string>::iterator	itcgi = const_cast<std::map<std::string,std::string>&>(loc->cgiExtensions).find(ext);
 						if (itcgi != loc->cgiExtensions.end())
 						{
-							if (!http::isSafePath(effectiveRoot, fullPath))
+							if (!http::isSafePath(fullPath))
 							{
 								resp.statusCode = 403;
 								resp.reason = httpReason(403);
@@ -524,15 +647,14 @@ void	Server::handleClientInput(Client &client)
 								}
 								else
 								{
-									// Parse CGI response: headers then body. Support both CRLF and LF.
-									size_t	hdrEnd = out.find("\r\n\r\n");
-									bool	crlf = true;
+									size_t								hdrEnd = out.find("\r\n\r\n");
+									bool								crlf = true;
 									if (hdrEnd == std::string::npos)
 									{
 										hdrEnd = out.find("\n\n");
 										crlf = false;
 									}
-									std::map<std::string,std::string>	cgih;
+									std::map<std::string, std::string>	cgih;
 									size_t								pos = 0;
 									if (hdrEnd != std::string::npos)
 									{
@@ -540,7 +662,7 @@ void	Server::handleClientInput(Client &client)
 										{
 											size_t		eol = out.find(crlf ? "\r\n" : "\n", pos);
 											if (eol == std::string::npos || eol > hdrEnd)
-												break;
+												break ;
 											std::string	line = out.substr(pos, eol - pos);
 											pos = eol + (crlf ? 2 : 1);
 											size_t		c = line.find(':');
@@ -555,12 +677,10 @@ void	Server::handleClientInput(Client &client)
 										resp.body.assign(out.data() + bodyStart, out.size() - bodyStart);
 									}
 									else
-										resp.body = out; // assume raw body
-									// Status header
+										resp.body = out;
 									std::map<std::string,std::string>::iterator	its = cgih.find("status");
 									if (its != cgih.end())
 									{
-										// format: "Status: 200 OK"
 										int code = std::atoi(its->second.c_str());
 										if (code < 100 || code > 599)
 											code = 200;
@@ -572,13 +692,11 @@ void	Server::handleClientInput(Client &client)
 										resp.statusCode = 200;
 										resp.reason = httpReason(200);
 									}
-									// Content-Type
 									std::map<std::string,std::string>::iterator	itcth = cgih.find("content-type");
 									if (itcth != cgih.end())
 										resp.headers["Content-Type"] = itcth->second;
 									else
 										resp.headers["Content-Type"] = "text/plain";
-									// Propagate other headers (e.g., Set-Cookie)
 									for (std::map<std::string,std::string>::iterator ih = cgih.begin(); ih != cgih.end(); ++ih)
 									{
 										if (ih->first == "status" || ih->first == "content-type")
@@ -589,13 +707,13 @@ void	Server::handleClientInput(Client &client)
 											if (name[i] == '-' && isalpha(name[i + 1]))
 											{
 												name[i + 1] = std::toupper(name[i + 1]);
-											} // keep lower for simplicity
+											}
 										resp.headers[name] = ih->second;
 									}
 								}
 							}
 							client.responseBuffer = resp.serialize(client.keepAlive);
-							return ; // done handling CGI
+							return ;
 						}
 					}
 					if (isDirectory(fullPath))
@@ -623,8 +741,6 @@ void	Server::handleClientInput(Client &client)
 							}
 							else
 							{
-								// Directory exists, no index matched, autoindex disabled:
-								// per user decision treat as 404 (resource not found) instead of 403.
 								resp.statusCode = 404;
 								resp.reason = httpReason(404);
 								applyErrorPage(servConf, resp.statusCode, resp);
@@ -633,7 +749,7 @@ void	Server::handleClientInput(Client &client)
 					}
 					else
 					{
-						if (!http::isSafePath(effectiveRoot, fullPath))
+						if (!http::isSafePath(fullPath))
 						{
 							resp.statusCode = 403;
 							resp.reason = httpReason(403);
@@ -658,7 +774,6 @@ void	Server::handleClientInput(Client &client)
 				}
 				else if (client.method == "POST")
 				{
-					// Enforce body size
 					size_t	allowed = loc ? loc->getBodySize(servConf.clientMaxBodySize) : servConf.clientMaxBodySize;
 					if (client.body.size() > allowed)
 					{
@@ -666,7 +781,6 @@ void	Server::handleClientInput(Client &client)
 						resp.reason = httpReason(413);
 						applyErrorPage(servConf, resp.statusCode, resp);
 					}
-					// CGI on POST as well
 					else if (loc)
 					{
 						std::string	relUrl = client.path;
@@ -680,7 +794,7 @@ void	Server::handleClientInput(Client &client)
 						std::map<std::string,std::string>::iterator	itcgi = const_cast<std::map<std::string,std::string>&>(loc->cgiExtensions).find(ext);
 						if (itcgi != loc->cgiExtensions.end())
 						{
-							if (!http::isSafePath(effectiveRoot, fullPath))
+							if (!http::isSafePath(fullPath))
 							{
 								resp.statusCode = 403;
 								resp.reason = httpReason(403);
@@ -705,7 +819,7 @@ void	Server::handleClientInput(Client &client)
 										crlf = false;
 									}
 									std::map<std::string,std::string>	cgih;
-									size_t								pos=0;
+									size_t								pos = 0;
 									if (hdrEnd != std::string::npos)
 									{
 										while (pos < hdrEnd)
@@ -760,16 +874,13 @@ void	Server::handleClientInput(Client &client)
 							return ;
 						}
 					}
-					else if (loc && loc->uploadPerm && !loc->uploadTo.empty())
+					if (loc && loc->uploadPerm && !loc->uploadTo.empty())
 					{
-						// Determine filename: prefer X-Filename header; fallback to timestamp name
 						std::string	fileName;
 						std::map<std::string,std::string>::iterator	hfn = client.headers.find("x-filename");
 						if (hfn != client.headers.end() && !hfn->second.empty())
 						{
-							// decode and sanitize
 							std::string	raw = http::urlDecode(hfn->second);
-							// keep basename only and restrict chars
 							size_t		slash = raw.find_last_of("/\\");
 							if (slash != std::string::npos)
 								raw = raw.substr(slash + 1);
@@ -777,12 +888,11 @@ void	Server::handleClientInput(Client &client)
 							for (size_t i = 0; i < raw.size(); ++i)
 							{
 								unsigned char	c = static_cast<unsigned char>(raw[i]);
-								if ((c >= 'a' && c <= 'z') ||(c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c=='.' || c == '_' || c == '-')
+								if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')
 									fileName.push_back(raw[i]);
 								else
 									fileName.push_back('_');
 							}
-							// avoid dangerous names
 							if (fileName == "." || fileName == ".." || fileName.empty())
 								fileName.clear();
 						}
@@ -793,9 +903,8 @@ void	Server::handleClientInput(Client &client)
 								if (fileName[i] == ' ' || fileName[i] == ':' || fileName[i] == ',')
 									fileName[i]='_';
 						}
-						// Build path and avoid traversal
 						std::string	fullOut = http::joinPath(loc->uploadTo, fileName);
-						if (!http::isSafePath(loc->uploadTo, fullOut))
+						if (!http::isSafePath(fullOut))
 						{
 							resp.statusCode = 403;
 							resp.reason = httpReason(403);
@@ -803,10 +912,8 @@ void	Server::handleClientInput(Client &client)
 							client.responseBuffer = resp.serialize(client.keepAlive);
 							return ;
 						}
-						// If exists, append numeric suffix
 						for (int n = 1; n < 100 && std::fopen(fullOut.c_str(), "rb"); ++n)
 						{
-							// close the probe handle
 							FILE	*tmp = std::fopen(fullOut.c_str(), "rb");
 							if (tmp)
 								std::fclose(tmp);
@@ -826,8 +933,8 @@ void	Server::handleClientInput(Client &client)
 							if (!client.body.empty())
 							std::fwrite(client.body.data(), 1, client.body.size(), fp);
 							std::fclose(fp);
-							resp.statusCode = 201; resp.reason = httpReason(201);
-							// Return URL path to uploaded file
+							resp.statusCode = 201;
+							resp.reason = httpReason(201);
 							resp.headers["Location"] = http::joinPath(loc->path, fileName);
 							resp.body = "Uploaded";
 							resp.headers["Content-Type"] = "text/plain";
@@ -872,7 +979,6 @@ void	Server::handleClientInput(Client &client)
 		}
 		else if (client.headersParsed && !client.requestComplete)
 		{
-			// Enforce body size as soon as headers are known
 			ServerConfig	&servConf = client.acceptingSock._sconf;
 			RouteResult		rr = HttpRouter::route(servConf, client.path);
 			LocationConfig	*loc = rr.location;
@@ -899,14 +1005,13 @@ void	Server::handleClientOutput(Client &client)
 	if (sent < 0)
 		return ;
 	client.bytesSent += sent;
-	if ((size_t)sent == client.responseBuffer.size())
+	if (static_cast<size_t>(sent) == client.responseBuffer.size())
 	{
 		client.resSent = true;
 		if (!client.keepAlive)
 			deleteClient(client.fd);
 		else
 		{
-			// Reset for next request
 			client.requestBuffer.clear();
 			client.responseBuffer.clear();
 			client.body.clear();

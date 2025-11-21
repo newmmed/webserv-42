@@ -12,9 +12,9 @@ namespace http
 	bool		iequals(const std::string& a, const std::string& b);
 	std::string	urlDecode(const std::string& in);
 	std::string	joinPath(const std::string& a, const std::string& b);
-	bool		isSafePath(const std::string& base, const std::string& path);
+	bool		isSafePath(const std::string& path);
 	std::string	guessContentType(const std::string& path);
 	std::string	formatDateGmt();
 }
 
-#endif // HTTP_UTILS_HPP
+#endif
